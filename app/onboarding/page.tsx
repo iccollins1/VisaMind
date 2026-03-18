@@ -78,7 +78,7 @@ export default function Onboarding() {
       {/* Nav */}
       <nav className="bg-white border-b border-gray-200 px-6 h-16 flex items-center">
         <span className="text-xl font-bold text-[#1B2E4B] tracking-tight">
-          Visa<span className="text-[#0E7C7B]">Mind</span>
+          Status<span className="text-[#0E7C7B]">Anchor</span>
         </span>
       </nav>
 
@@ -282,7 +282,7 @@ export default function Onboarding() {
           </div>
 
           <p className="text-center text-xs text-gray-400 mt-5 leading-relaxed">
-            VisaMind provides immigration information, not legal advice.
+            StatusAnchor provides immigration information, not legal advice.
           </p>
         </div>
       </main>

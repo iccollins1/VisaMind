@@ -40,7 +40,7 @@ export default function SignIn() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="text-2xl font-extrabold text-[#1B2E4B] tracking-tight">
-            Visa<span className="text-[#0E7C7B]">Mind</span>
+            Status<span className="text-[#0E7C7B]">Anchor</span>
           </Link>
           <p className="text-gray-500 text-sm mt-2">Sign in to your account</p>
         </div>

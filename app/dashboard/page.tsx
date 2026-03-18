@@ -27,7 +27,7 @@ const features = [
   {
     icon: '⚖️',
     title: 'Attorney escalation',
-    body: 'When your situation needs a real lawyer, VisaMind connects you immediately to vetted immigration attorneys.',
+    body: 'When your situation needs a real lawyer, StatusAnchor connects you immediately to vetted immigration attorneys.',
   },
 ]
 
@@ -83,7 +83,7 @@ export default function Dashboard() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 px-6 h-16 flex items-center justify-between">
         <Link href="/" className="text-xl font-bold text-[#1B2E4B] tracking-tight">
-          Visa<span className="text-[#0E7C7B]">Mind</span>
+          Status<span className="text-[#0E7C7B]">Anchor</span>
         </Link>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-400 hidden sm:block">{email}</span>
@@ -102,7 +102,7 @@ export default function Dashboard() {
         <div className="mb-10">
           <p className="text-xs font-bold uppercase tracking-widest text-[#0E7C7B] mb-2">Dashboard</p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-[#1B2E4B] tracking-tight">
-            Welcome to VisaMind
+            Welcome to StatusAnchor
           </h1>
           <p className="text-gray-500 mt-2 text-sm">You&apos;re signed in as <strong>{email}</strong></p>
         </div>
@@ -195,7 +195,7 @@ export default function Dashboard() {
         <div className="bg-[#E6F4F4] border border-[#B2DFDF] rounded-xl p-5 flex gap-3">
           <span className="text-base mt-0.5">ℹ️</span>
           <p className="text-xs text-[#2D6A6A] leading-relaxed">
-            VisaMind provides general immigration information derived from publicly available USCIS guidance — not legal advice. All timelines are system-calculated based on your inputs. When in doubt, consult a licensed immigration attorney.
+            StatusAnchor provides general immigration information derived from publicly available USCIS guidance — not legal advice. All timelines are system-calculated based on your inputs. When in doubt, consult a licensed immigration attorney.
           </p>
         </div>
 

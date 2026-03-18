@@ -57,7 +57,7 @@ export default function SignUp() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="text-2xl font-extrabold text-[#1B2E4B] tracking-tight">
-            Visa<span className="text-[#0E7C7B]">Mind</span>
+            Status<span className="text-[#0E7C7B]">Anchor</span>
           </Link>
           <p className="text-gray-500 text-sm mt-2">Create your free account</p>
         </div>
@@ -115,7 +115,7 @@ export default function SignUp() {
           {/* Disclaimer */}
           <div className="mt-5 p-3 bg-[#E6F4F4] rounded-lg">
             <p className="text-xs text-[#2D6A6A] leading-relaxed">
-              VisaMind provides immigration information, not legal advice. By signing up you agree to our{' '}
+              StatusAnchor provides immigration information, not legal advice. By signing up you agree to our{' '}
               <Link href="/terms" className="underline">Terms of Service</Link> and{' '}
               <Link href="/privacy" className="underline">Privacy Policy</Link>.
             </p>

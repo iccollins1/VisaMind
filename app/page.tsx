@@ -7,7 +7,7 @@ export default function Home() {
       {/* NAV */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 px-6 h-16 flex items-center justify-between">
         <div className="text-xl font-bold text-[#1B2E4B] tracking-tight">
-          Visa<span className="text-[#0E7C7B]">Mind</span>
+          Status<span className="text-[#0E7C7B]">Anchor</span>
         </div>
         <div className="hidden md:flex items-center gap-8">
           <a href="#how" className="text-sm font-medium text-gray-500 hover:text-[#1B2E4B]">How it works</a>
@@ -29,7 +29,7 @@ export default function Home() {
           Never miss a visa deadline <span className="text-[#0E7C7B]">again.</span>
         </h1>
         <p className="text-lg text-gray-500 max-w-xl mx-auto mb-10 leading-relaxed">
-          VisaMind tracks your immigration timeline, explains every deadline in plain English, and tells you exactly when you need a real attorney — before it&apos;s too late.
+          StatusAnchor tracks your immigration timeline, explains every deadline in plain English, and tells you exactly when you need a real attorney — before it&apos;s too late.
         </p>
         <div className="flex flex-wrap gap-4 justify-center mb-5">
           <Link href="/signup" className="bg-[#0E7C7B] text-white font-bold px-8 py-3.5 rounded-xl hover:bg-[#1B2E4B] transition-colors text-base">
@@ -92,14 +92,14 @@ export default function Home() {
           <p className="text-xs font-bold uppercase tracking-widest text-[#0E7C7B] mb-3">How it works</p>
           <h2 className="text-3xl md:text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-4">Your timeline in 5 minutes.</h2>
           <p className="text-gray-500 max-w-xl mb-10 leading-relaxed">
-            Input your details once. VisaMind maps every critical date, tracks every deadline, and tells you exactly when you need a real attorney.
+            Input your details once. StatusAnchor maps every critical date, tracks every deadline, and tells you exactly when you need a real attorney.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
               { n: '1', title: 'Input your details', body: 'Visa type, program dates, current status. Structured onboarding under 5 minutes.' },
-              { n: '2', title: 'Get your timeline', body: 'VisaMind maps every critical deadline based on publicly available USCIS guidance.' },
+              { n: '2', title: 'Get your timeline', body: 'StatusAnchor maps every critical deadline based on publicly available USCIS guidance.' },
               { n: '3', title: 'Stay ahead automatically', body: 'Weekly Visa Health Checks land in your inbox. Policy changes explained in plain English.' },
-              { n: '4', title: 'Get an attorney when you need one', body: 'When your situation needs more than information, VisaMind connects you immediately.' },
+              { n: '4', title: 'Get an attorney when you need one', body: 'When your situation needs more than information, StatusAnchor connects you immediately.' },
             ].map(s => (
               <div key={s.n} className="text-center">
                 <div className="w-12 h-12 bg-[#E6F4F4] text-[#0E7C7B] rounded-xl flex items-center justify-center font-extrabold text-lg mx-auto mb-4">{s.n}</div>
@@ -174,7 +174,7 @@ export default function Home() {
         <div className="mt-8 bg-[#E6F4F4] border border-[#B2DFDF] rounded-xl p-5 flex gap-3">
           <span className="text-base mt-0.5">ℹ️</span>
           <p className="text-xs text-[#2D6A6A] leading-relaxed">
-            VisaMind provides general immigration information derived from publicly available USCIS guidance — not legal advice. All timelines are system-calculated based on your inputs. Your situation may have factors that affect these outputs. When in doubt, consult a licensed immigration attorney.
+            StatusAnchor provides general immigration information derived from publicly available USCIS guidance — not legal advice. All timelines are system-calculated based on your inputs. Your situation may have factors that affect these outputs. When in doubt, consult a licensed immigration attorney.
           </p>
         </div>
       </section>
@@ -191,10 +191,10 @@ export default function Home() {
       {/* FOOTER */}
       <footer className="bg-white border-t border-gray-200 py-8 px-6 text-center">
         <p className="text-xs text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          VisaMind provides general immigration information derived from publicly available USCIS guidance and documentation. VisaMind is not a law firm and does not provide legal advice. No attorney-client relationship is formed through use of this platform. All outputs are system-calculated information based on user-provided data.
+          StatusAnchor provides general immigration information derived from publicly available USCIS guidance and documentation. StatusAnchor is not a law firm and does not provide legal advice. No attorney-client relationship is formed through use of this platform. All outputs are system-calculated information based on user-provided data.
         </p>
         <p className="text-xs text-gray-400 mt-3">
-          © 2026 VisaMind · visamind.app ·{' '}
+          © 2026 StatusAnchor · statusanchor.app ·{' '}
           <Link href="/privacy" className="text-[#0E7C7B] hover:underline">Privacy Policy</Link> ·{' '}
           <Link href="/terms" className="text-[#0E7C7B] hover:underline">Terms of Service</Link>
         </p>
