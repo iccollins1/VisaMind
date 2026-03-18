@@ -37,7 +37,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-type ChatMessage = { role: 'user' | 'assistant'; content: string }
+type ChatMessage = { role: 'user' | 'assistant'; content: string; escalation?: boolean }
 
 const ESCALATION_KEYWORDS = [
   'rfe', 'request for evidence', 'denial', 'denied', 'visa denial',
@@ -62,7 +62,6 @@ export default function Dashboard() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
-  const [escalated, setEscalated] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -101,11 +100,9 @@ export default function Dashboard() {
         const restored: ChatMessage[] = []
         for (const row of interactions) {
           restored.push({ role: 'user', content: row.user_message })
-          restored.push({ role: 'assistant', content: row.ai_response })
+          restored.push({ role: 'assistant', content: row.ai_response, escalation: row.is_escalation })
         }
         setChatMessages(restored)
-        const lastRow = interactions[interactions.length - 1]
-        if (lastRow.is_escalation) setEscalated(true)
       }
 
       setProfileLoaded(true)
@@ -124,7 +121,7 @@ export default function Dashboard() {
 
   const sendMessage = async () => {
     const text = chatInput.trim()
-    if (!text || chatLoading || escalated) return
+    if (!text || chatLoading) return
 
     const userMessage: ChatMessage = { role: 'user', content: text }
     const updatedMessages = [...chatMessages, userMessage]
@@ -134,7 +131,7 @@ export default function Dashboard() {
 
     // Check escalation client-side first for immediate feedback
     if (containsEscalationKeyword(text)) {
-      setEscalated(true)
+      setChatMessages([...updatedMessages, { role: 'assistant', content: '', escalation: true }])
       setChatLoading(false)
       const { data: { session: s } } = await supabase.auth.getSession()
       if (s) {
@@ -167,8 +164,10 @@ export default function Dashboard() {
       })
 
       if (res.headers.get('X-Escalation') === 'true') {
-        setEscalated(true)
-        setChatMessages(prev => prev.slice(0, -1))
+        setChatMessages(prev => [
+          ...prev.slice(0, -1),
+          { role: 'assistant', content: '', escalation: true },
+        ])
         const { data: { session: s } } = await supabase.auth.getSession()
         if (s) {
           await supabase.from('ai_interactions').insert({
@@ -351,7 +350,7 @@ export default function Dashboard() {
 
               {/* Messages */}
               <div className="h-80 overflow-y-auto px-5 py-4 space-y-4">
-                {chatMessages.length === 0 && !escalated && (
+                {chatMessages.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center text-center gap-3">
                     <div className="text-3xl">🤖</div>
                     <p className="text-sm font-medium text-[#1B2E4B]">Ask anything about your {profile.visa_type} status</p>
@@ -378,78 +377,76 @@ export default function Dashboard() {
 
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-[#1B2E4B] text-white rounded-br-sm'
-                        : 'bg-gray-100 text-[#1a1a2e] rounded-bl-sm prose prose-sm max-w-none'
-                    }`}>
-                      {msg.content
-                        ? msg.role === 'assistant'
-                          ? <ReactMarkdown
-                              components={{
-                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                                strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                                code: ({ children }) => <code className="bg-black/10 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
-                              }}
-                            >{msg.content}</ReactMarkdown>
-                          : msg.content
-                        : (chatLoading && i === chatMessages.length - 1
-                          ? <span className="inline-flex gap-1 items-center"><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}} /></span>
-                          : null)}
-                    </div>
+                    {msg.escalation ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-[90%]">
+                        <div className="flex items-start gap-3">
+                          <span className="text-lg">⚖️</span>
+                          <div>
+                            <p className="text-sm font-bold text-amber-800 mb-1">Attorney consultation required</p>
+                            <p className="text-xs text-amber-700 leading-relaxed">
+                              Your question involves a situation — such as an RFE, visa denial, unauthorized employment, status gap, or removal proceedings — that requires a licensed immigration attorney. StatusAnchor cannot provide guidance on these matters.
+                            </p>
+                            <Link
+                              href="/upgrade"
+                              className="inline-flex items-center gap-1.5 mt-3 bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-800 transition-colors"
+                            >
+                              Find an attorney near you →
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-[#1B2E4B] text-white rounded-br-sm'
+                          : 'bg-gray-100 text-[#1a1a2e] rounded-bl-sm prose prose-sm max-w-none'
+                      }`}>
+                        {msg.content
+                          ? msg.role === 'assistant'
+                            ? <ReactMarkdown
+                                components={{
+                                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                                  strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                  code: ({ children }) => <code className="bg-black/10 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+                                }}
+                              >{msg.content}</ReactMarkdown>
+                            : msg.content
+                          : (chatLoading && i === chatMessages.length - 1
+                            ? <span className="inline-flex gap-1 items-center"><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}} /></span>
+                            : null)}
+                      </div>
+                    )}
                   </div>
                 ))}
-
-                {/* Escalation message */}
-                {escalated && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-lg">⚖️</span>
-                      <div>
-                        <p className="text-sm font-bold text-amber-800 mb-1">Attorney consultation required</p>
-                        <p className="text-xs text-amber-700 leading-relaxed">
-                          Your question involves a situation — such as an RFE, visa denial, unauthorized employment, status gap, or removal proceedings — that requires a licensed immigration attorney. StatusAnchor cannot provide guidance on these matters.
-                        </p>
-                        <p className="text-xs text-amber-700 font-semibold mt-2">Please consult a qualified immigration attorney immediately.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
               <div className="border-t border-gray-100 px-4 py-3">
-                {escalated ? (
-                  <p className="text-xs text-center text-gray-400 py-1">
-                    Chat locked — please consult an immigration attorney for your situation.
-                  </p>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={e => setChatInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                      placeholder="Ask about your visa status, deadlines, next steps…"
-                      className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 text-[#1a1a2e] placeholder-gray-400 focus:outline-none focus:border-[#0E7C7B] focus:ring-1 focus:ring-[#0E7C7B] transition-colors"
-                      disabled={chatLoading}
-                    />
-                    <button
-                      onClick={sendMessage}
-                      disabled={chatLoading || !chatInput.trim()}
-                      className="bg-[#0E7C7B] text-white px-4 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    placeholder="Ask about your visa status, deadlines, next steps…"
+                    className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 text-[#1a1a2e] placeholder-gray-400 focus:outline-none focus:border-[#0E7C7B] focus:ring-1 focus:ring-[#0E7C7B] transition-colors"
+                    disabled={chatLoading}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="bg-[#0E7C7B] text-white px-4 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
             </div>
