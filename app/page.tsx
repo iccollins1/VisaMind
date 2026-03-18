@@ -160,9 +160,9 @@ export default function Home() {
           <div className="bg-white border border-gray-200 rounded-2xl p-7">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Pro</p>
             <p className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-1">$29<span className="text-base font-medium text-gray-400">/mo</span></p>
-            <p className="text-sm text-gray-400 mb-6">For complex situations and transitions.</p>
+            <p className="text-sm text-gray-400 mb-6">For complex situations, transitions, and higher-stakes timelines.</p>
             <ul className="space-y-2 mb-8">
-              {['Everything in Student', 'Multiple visa types', 'AI interview prep', 'Priority attorney directory', 'F-1 → H-1B transition support'].map(f => (
+              {['Everything in Core', 'Multiple visa types', 'Attorney referral access (pre-qualified, context-aware)', 'Priority support', 'Policy change alerts'].map(f => (
                 <li key={f} className="flex items-start gap-2 text-sm text-[#1a1a2e]">
                   <span className="text-[#0E7C7B] font-bold mt-0.5">✓</span>{f}
                 </li>
