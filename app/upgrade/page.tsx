@@ -46,9 +46,8 @@ export default function Upgrade() {
             Less than one minute of an attorney&apos;s time. Cancel anytime.
           </p>
 
-          {/* Student discount note */}
           <div className="inline-flex items-center gap-2 bg-[#E6F4F4] text-[#0E7C7B] text-xs font-bold px-4 py-2 rounded-full mt-5">
-            🎓 .edu emails get Core for $9/mo — student pricing applied automatically
+            🎓 Students save $5/mo with a .edu email
           </div>
         </div>
 
@@ -59,10 +58,16 @@ export default function Upgrade() {
           <div className="bg-white border border-gray-200 rounded-2xl p-8">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Core</p>
             <div className="flex items-end gap-1 mb-1">
-              <span className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight">$9</span>
-              <span className="text-base font-medium text-gray-400 mb-1">/mo</span>
+              <span className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight line-through text-gray-300">$14</span>
+              <span className="text-base font-medium text-gray-300 mb-1">/mo</span>
             </div>
-            <p className="text-sm text-gray-400 mb-6">For students and visa holders who need clarity.</p>
+            <div className="flex items-end gap-1 mb-1">
+              <span className="text-4xl font-extrabold text-[#0E7C7B] tracking-tight">$9</span>
+              <span className="text-base font-medium text-gray-400 mb-1">/mo</span>
+              <span className="text-xs font-bold text-[#0E7C7B] mb-1.5 ml-1">Student price</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-1">Use your .edu email at signup and student pricing applies automatically.</p>
+            <p className="text-sm text-gray-400 mt-3 mb-6">For students and visa holders who need clarity.</p>
 
             <ul className="space-y-3 mb-8">
               {coreFeatures.map(f => (

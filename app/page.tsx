@@ -136,14 +136,15 @@ export default function Home() {
               Get started free
             </Link>
           </div>
-          {/* Student */}
+          {/* Core / Student */}
           <div className="bg-white border-2 border-[#0E7C7B] rounded-2xl p-7 relative shadow-sm">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0E7C7B] text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap uppercase tracking-wide">
-              Most popular · Student
+              Most popular · Core
             </div>
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Student</p>
-            <p className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-1">$9<span className="text-base font-medium text-gray-400">/mo</span></p>
-            <p className="text-sm text-gray-400 mb-6">Verified with your .edu email.</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Core</p>
+            <p className="text-4xl font-extrabold text-gray-300 tracking-tight line-through mb-0.5">$14<span className="text-base font-medium text-gray-300">/mo</span></p>
+            <p className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-0.5">$9<span className="text-base font-medium text-gray-400">/mo</span> <span className="text-sm font-bold text-[#0E7C7B]">Student price</span></p>
+            <p className="text-xs text-gray-400 mb-4">Use your .edu email at signup and student pricing applies automatically.</p>
             <ul className="space-y-2 mb-8">
               {['Everything in Free', 'AI Q&A in plain English', 'Document vault', 'Weekly Visa Health Check', 'Policy change alerts', 'Attorney escalation access'].map(f => (
                 <li key={f} className="flex items-start gap-2 text-sm text-[#1a1a2e]">
@@ -152,7 +153,7 @@ export default function Home() {
               ))}
             </ul>
             <Link href="/signup" className="block text-center py-2.5 rounded-lg bg-[#0E7C7B] text-white font-bold text-sm hover:bg-[#1B2E4B] transition-colors">
-              Start for $9/mo
+              Get Core — from $9/mo
             </Link>
           </div>
           {/* Pro */}
