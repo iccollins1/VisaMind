@@ -15,6 +15,8 @@ type VisaProfile = {
   country_of_citizenship: string
   plan_tier: 'free' | 'core' | 'pro'
   opt_start_date?: string | null
+  ai_questions_used: number
+  ai_questions_reset_date: string
 }
 
 const features = [
@@ -43,13 +45,52 @@ function formatDate(iso: string) {
 type ChatMessage = { role: 'user' | 'assistant'; content: string; escalation?: boolean }
 
 const ESCALATION_MARKER = '\x00ESCALATE\x00'
+const FREE_QUESTION_LIMIT = 5
+
+function isResetDue(resetDateStr: string): boolean {
+  const reset = new Date(resetDateStr)
+  const due = new Date(reset)
+  due.setDate(reset.getDate() + 30)
+  return new Date() >= due
+}
+
+function DeadlineCard({ dl }: { dl: Deadline }) {
+  const c = deadlineColors(dl.days_until)
+  const absDays = Math.abs(dl.days_until)
+  const pillLabel =
+    dl.days_until === 0 ? 'Today' :
+    dl.days_until > 0 ? `${absDays}d away` :
+    `${absDays}d overdue`
+  const badgeLabel =
+    dl.status === 'overdue' ? 'Overdue' :
+    dl.status === 'urgent' ? 'Urgent' :
+    dl.days_until <= 90 ? 'Soon' : 'Upcoming'
+
+  return (
+    <div className={`bg-white border border-gray-200 border-l-4 ${c.border} rounded-xl px-5 py-4 flex items-start justify-between gap-4`}>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <p className="text-sm font-bold text-[#1B2E4B]">{dl.title}</p>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.badge} ${c.badgeText}`}>
+            {badgeLabel}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 mb-1">{formatDeadlineDate(dl.date)}</p>
+        <p className="text-xs text-gray-400 leading-relaxed">{dl.description}</p>
+      </div>
+      <div className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap ${c.pill} ${c.pillText}`}>
+        {pillLabel}
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [profile, setProfile] = useState<VisaProfile | null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
-
+  const [questionsUsed, setQuestionsUsed] = useState(0)
   const [deadlines, setDeadlines] = useState<Deadline[]>([])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -71,19 +112,35 @@ export default function Dashboard() {
 
       const { data, error } = await supabase
         .from('visa_profiles')
-        .select('visa_type, program_start_date, program_end_date, university_name, country_of_citizenship, plan_tier, opt_start_date')
+        .select('visa_type, program_start_date, program_end_date, university_name, country_of_citizenship, plan_tier, opt_start_date, ai_questions_used, ai_questions_reset_date')
         .eq('user_id', user.id)
         .limit(1)
 
       console.log('[dashboard] visa_profiles result:', { data, error })
       if (error) console.log('[dashboard] full error object:', JSON.stringify(error, null, 2))
 
-      const raw = data?.[0] ?? null
-      const resolved = raw ? { ...raw, plan_tier: raw.plan_tier ?? 'free' } : null
-      setProfile(resolved)
-      if (resolved) {
-        setDeadlines(calculateDeadlines(resolved))
+      if (!data?.[0]) {
+        setProfile(null)
+        setProfileLoaded(true)
+        return
       }
+
+      let raw = { ...data[0], plan_tier: data[0].plan_tier ?? 'free' }
+
+      // Client-side reset: if 30+ days have passed since last reset, zero out the counter
+      if (raw.ai_questions_reset_date && raw.plan_tier === 'free' && isResetDue(raw.ai_questions_reset_date)) {
+        const todayStr = new Date().toISOString().split('T')[0]
+        await supabase
+          .from('visa_profiles')
+          .update({ ai_questions_used: 0, ai_questions_reset_date: todayStr })
+          .eq('user_id', user.id)
+        raw = { ...raw, ai_questions_used: 0, ai_questions_reset_date: todayStr }
+      }
+
+      const resolved = raw as VisaProfile
+      setProfile(resolved)
+      setQuestionsUsed(resolved.ai_questions_used ?? 0)
+      setDeadlines(calculateDeadlines(resolved))
 
       // Load last 20 chat interactions
       const { data: interactions } = await supabase
@@ -119,6 +176,8 @@ export default function Dashboard() {
   const sendMessage = async () => {
     const text = chatInput.trim()
     if (!text || chatLoading) return
+    // Safety guard — UI should prevent this but belt-and-suspenders
+    if (profile?.plan_tier === 'free' && questionsUsed >= FREE_QUESTION_LIMIT) return
 
     const userMessage: ChatMessage = { role: 'user', content: text }
     const updatedMessages = [...chatMessages, userMessage]
@@ -154,6 +213,18 @@ export default function Dashboard() {
 
       const { data: { session: s } } = await supabase.auth.getSession()
 
+      // Increment question count for free users after any completed interaction
+      const maybeIncrementCount = async () => {
+        if (profile?.plan_tier === 'free' && s) {
+          const newCount = questionsUsed + 1
+          setQuestionsUsed(newCount)
+          await supabase
+            .from('visa_profiles')
+            .update({ ai_questions_used: newCount })
+            .eq('user_id', s.user.id)
+        }
+      }
+
       if (firstChunk === ESCALATION_MARKER) {
         setChatMessages(prev => [
           ...prev.slice(0, -1),
@@ -167,6 +238,7 @@ export default function Dashboard() {
             is_escalation: true,
           })
         }
+        await maybeIncrementCount()
         return
       }
 
@@ -187,7 +259,6 @@ export default function Dashboard() {
         ])
       }
 
-      // Save completed interaction
       if (s && accumulated) {
         await supabase.from('ai_interactions').insert({
           user_id: s.user.id,
@@ -196,6 +267,7 @@ export default function Dashboard() {
           is_escalation: false,
         })
       }
+      await maybeIncrementCount()
     } catch {
       setChatMessages(prev => [
         ...prev.slice(0, -1),
@@ -207,6 +279,11 @@ export default function Dashboard() {
   }
 
   if (!email || !profileLoaded) return null
+
+  const isFree = profile?.plan_tier === 'free'
+  const atLimit = isFree && questionsUsed >= FREE_QUESTION_LIMIT
+  const nearLimit = isFree && questionsUsed === FREE_QUESTION_LIMIT - 1
+  const remaining = FREE_QUESTION_LIMIT - questionsUsed
 
   return (
     <div className="min-h-screen bg-[#F9F7F4] text-[#1a1a2e]">
@@ -302,47 +379,45 @@ export default function Dashboard() {
                   Deadline tracking for {profile.visa_type} is coming soon.
                 </p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {deadlines.map((dl, i) => {
-                  const c = deadlineColors(dl.days_until)
-                  const absDays = Math.abs(dl.days_until)
-                  const pillLabel =
-                    dl.days_until === 0
-                      ? 'Today'
-                      : dl.days_until > 0
-                      ? `${absDays}d away`
-                      : `${absDays}d overdue`
-                  const badgeLabel =
-                    dl.status === 'overdue'
-                      ? 'Overdue'
-                      : dl.status === 'urgent'
-                      ? 'Urgent'
-                      : dl.days_until <= 90
-                      ? 'Soon'
-                      : 'Upcoming'
-
-                  return (
-                    <div
-                      key={i}
-                      className={`bg-white border border-gray-200 border-l-4 ${c.border} rounded-xl px-5 py-4 flex items-start justify-between gap-4`}
+            ) : isFree && deadlines.length > 2 ? (
+              /* Free users: show first 2, gate the rest */
+              <div>
+                <div className="space-y-3 mb-3">
+                  {deadlines.slice(0, 2).map((dl, i) => (
+                    <DeadlineCard key={i} dl={dl} />
+                  ))}
+                </div>
+                <div className="relative rounded-xl overflow-hidden">
+                  {/* Blurred remaining cards */}
+                  <div className="space-y-3 blur-sm pointer-events-none select-none">
+                    {deadlines.slice(2).map((dl, i) => (
+                      <DeadlineCard key={i} dl={dl} />
+                    ))}
+                  </div>
+                  {/* Upgrade overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/85 backdrop-blur-[2px] px-6 py-8 text-center rounded-xl">
+                    <div className="text-2xl mb-3">🔒</div>
+                    <p className="text-sm font-bold text-[#1B2E4B] mb-3">
+                      Unlock your full immigration timeline — upgrade to Core
+                    </p>
+                    <Link
+                      href="/upgrade"
+                      className="bg-[#0E7C7B] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors mb-3"
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <p className="text-sm font-bold text-[#1B2E4B]">{dl.title}</p>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.badge} ${c.badgeText}`}>
-                            {badgeLabel}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-1">{formatDeadlineDate(dl.date)}</p>
-                        <p className="text-xs text-gray-400 leading-relaxed">{dl.description}</p>
-                      </div>
-                      <div className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap ${c.pill} ${c.pillText}`}>
-                        {pillLabel}
-                      </div>
-                    </div>
-                  )
-                })}
+                      Upgrade to Core
+                    </Link>
+                    <p className="text-xs text-gray-400 max-w-xs">
+                      Most users upgrade when they realize how close their next deadline is.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Paid users: show all */
+              <div className="space-y-3">
+                {deadlines.map((dl, i) => (
+                  <DeadlineCard key={i} dl={dl} />
+                ))}
               </div>
             )}
           </div>
@@ -378,42 +453,25 @@ export default function Dashboard() {
           <div className="mb-10">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">AI Q&amp;A</p>
 
-            {profile.plan_tier === 'free' ? (
-              /* Locked state for free users */
-              <div className="relative rounded-2xl overflow-hidden border border-gray-200">
-                {/* Blurred preview */}
-                <div className="blur-sm pointer-events-none select-none bg-white">
-                  <div className="bg-[#E6F4F4] border-b border-[#B2DFDF] px-5 py-2.5">
-                    <p className="text-xs text-[#2D6A6A] font-medium">Information only — not legal advice. Based on official USCIS guidance.</p>
-                  </div>
-                  <div className="h-48 px-5 py-4 space-y-3">
-                    <div className="flex justify-end"><div className="bg-[#1B2E4B] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[60%]">What is the OPT application window?</div></div>
-                    <div className="flex justify-start"><div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-[75%] text-[#1a1a2e]">You can apply for OPT up to 90 days before your program end date and no later than 60 days after...</div></div>
-                  </div>
-                  <div className="border-t border-gray-100 px-4 py-3">
-                    <div className="flex gap-2">
-                      <div className="flex-1 bg-gray-100 rounded-xl h-10" />
-                      <div className="bg-[#0E7C7B] rounded-xl w-12 h-10" />
-                    </div>
-                  </div>
-                </div>
-                {/* Upgrade overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-[2px] px-6 text-center">
-                  <div className="text-3xl mb-3">🔒</div>
-                  <p className="text-sm font-bold text-[#1B2E4B] mb-1">AI Q&amp;A is a Core feature</p>
-                  <p className="text-xs text-gray-500 mb-4 max-w-xs">
-                    Ask anything about your visa status and get plain-English answers based on official USCIS guidance.
-                  </p>
-                  <Link
-                    href="/upgrade"
-                    className="bg-[#0E7C7B] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors"
-                  >
-                    Upgrade to Core to unlock AI Q&amp;A — from $9/mo
-                  </Link>
-                </div>
+            {atLimit ? (
+              /* Hard wall — free user has used all 5 questions */
+              <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
+                <div className="text-3xl mb-4">🔒</div>
+                <p className="text-sm font-bold text-[#1B2E4B] mb-2">
+                  You&apos;ve reached your 5 free questions this month
+                </p>
+                <p className="text-xs text-gray-500 mb-5 max-w-xs mx-auto leading-relaxed">
+                  Upgrade to Core for unlimited AI Q&amp;A — answers based on official USCIS guidance, available 24/7.
+                </p>
+                <Link
+                  href="/upgrade"
+                  className="inline-flex bg-[#0E7C7B] text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#1B2E4B] transition-colors"
+                >
+                  Upgrade to Core for unlimited AI Q&amp;A
+                </Link>
               </div>
             ) : (
-              /* Full chat for core / pro users */
+              /* Active chat — free (with counter) or paid */
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
                 {/* Disclaimer bar */}
@@ -512,8 +570,28 @@ export default function Dashboard() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
-                <div className="border-t border-gray-100 px-4 py-3">
+                {/* Counter + warning + input — only for free users with questions remaining */}
+                <div className="border-t border-gray-100 px-4 pt-3 pb-3">
+
+                  {isFree && (
+                    <div className="mb-2.5">
+                      <p className="text-xs text-gray-400 font-medium">
+                        {questionsUsed} of {FREE_QUESTION_LIMIT} questions used this month
+                      </p>
+                      {nearLimit && (
+                        <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+                          <span className="text-amber-500 text-xs mt-0.5">⚠</span>
+                          <p className="text-xs text-amber-700 leading-relaxed">
+                            {remaining} free question{remaining !== 1 ? 's' : ''} remaining this month —{' '}
+                            <Link href="/upgrade" className="font-bold underline hover:no-underline">
+                              upgrade to Core for unlimited access
+                            </Link>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -534,6 +612,7 @@ export default function Dashboard() {
                       </svg>
                     </button>
                   </div>
+
                 </div>
 
               </div>
