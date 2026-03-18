@@ -41,8 +41,11 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 const ESCALATION_KEYWORDS = [
   'rfe', 'request for evidence', 'denial', 'denied', 'visa denial',
-  'unauthorized employment', 'unauthorized work', 'status gap',
-  'out of status', 'unlawful presence', 'deportation', 'removal', 'deported',
+  'unauthorized employment', 'unauthorized work',
+  'worked before my ead', 'worked without ead', 'worked before ead',
+  'status gap', 'gap in my status', 'gap in status', 'out of status', 'unlawful presence',
+  'deportation', 'removal', 'deported',
+  'revoked', 'visa revoked', 'h-1b revoked', 'petition revoked',
 ]
 
 function containsEscalationKeyword(text: string) {

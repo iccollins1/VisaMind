@@ -7,8 +7,10 @@ const ESCALATION_KEYWORDS = [
   'rfe', 'request for evidence',
   'denial', 'denied', 'visa denial',
   'unauthorized employment', 'unauthorized work',
-  'status gap', 'out of status', 'unlawful presence',
+  'worked before my ead', 'worked without ead', 'worked before ead',
+  'status gap', 'gap in my status', 'gap in status', 'out of status', 'unlawful presence',
   'deportation', 'removal', 'deported',
+  'revoked', 'visa revoked', 'h-1b revoked', 'petition revoked',
 ]
 
 function containsEscalationKeyword(text: string): boolean {
@@ -42,6 +44,7 @@ CRITICAL RULES:
 4. Never tell a user what they "should" or "must" do — say what USCIS rules state.
 5. Keep answers clear, plain-English, and structured. Use bullet points for deadlines or steps.
 6. If asked about something outside USCIS/immigration, politely redirect to immigration topics only.
+7. BREVITY: Keep responses concise — 3 to 5 sentences for simple questions. Do not dump everything at once. End with "Want more details?" if there is more relevant information you could share. Only expand if the user asks for more.
 ${profileContext}
 
 ESCALATION: If the user's message contains any of the following situations — RFE (Request for Evidence), visa denial, unauthorized employment, status gaps, unlawful presence, or deportation/removal proceedings — do not attempt to answer. Instead, immediately flag that this situation requires a licensed immigration attorney.`
@@ -77,35 +80,46 @@ export async function POST(req: NextRequest) {
     content: m.content,
   }))
 
-  const stream = await client.messages.stream({
-    model: 'claude-opus-4-6',
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: anthropicMessages,
-  })
+  try {
+    const stream = await client.messages.stream({
+      model: 'claude-opus-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: anthropicMessages,
+    })
 
-  const encoder = new TextEncoder()
-  const readable = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const event of stream) {
-          if (
-            event.type === 'content_block_delta' &&
-            event.delta.type === 'text_delta'
-          ) {
-            controller.enqueue(encoder.encode(event.delta.text))
+    const encoder = new TextEncoder()
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'text_delta'
+            ) {
+              controller.enqueue(encoder.encode(event.delta.text))
+            }
           }
+        } catch (streamErr) {
+          console.error('[chat] stream error:', streamErr)
+          controller.enqueue(encoder.encode('[Error reading stream]'))
+        } finally {
+          controller.close()
         }
-      } finally {
-        controller.close()
-      }
-    },
-  })
+      },
+    })
 
-  return new Response(readable, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'X-Escalation': 'false',
-    },
-  })
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Escalation': 'false',
+      },
+    })
+  } catch (err) {
+    console.error('[chat] Anthropic API error:', err)
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 }
