@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { calculateDeadlines, deadlineColors, formatDeadlineDate, type Deadline } from '@/lib/deadlines'
 
 type VisaProfile = {
   visa_type: string
@@ -12,6 +13,8 @@ type VisaProfile = {
   program_end_date: string
   university_name: string | null
   country_of_citizenship: string
+  plan_tier: 'free' | 'core' | 'pro'
+  opt_start_date?: string | null
 }
 
 const features = [
@@ -39,19 +42,7 @@ function formatDate(iso: string) {
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; escalation?: boolean }
 
-const ESCALATION_KEYWORDS = [
-  'rfe', 'request for evidence', 'denial', 'denied', 'visa denial',
-  'unauthorized employment', 'unauthorized work',
-  'worked before my ead', 'worked without ead', 'worked before ead',
-  'status gap', 'gap in my status', 'gap in status', 'out of status', 'unlawful presence',
-  'deportation', 'removal', 'deported',
-  'revoked', 'visa revoked', 'h-1b revoked', 'petition revoked',
-]
-
-function containsEscalationKeyword(text: string) {
-  const lower = text.toLowerCase()
-  return ESCALATION_KEYWORDS.some(kw => lower.includes(kw))
-}
+const ESCALATION_MARKER = '\x00ESCALATE\x00'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -59,6 +50,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<VisaProfile | null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
 
+  const [deadlines, setDeadlines] = useState<Deadline[]>([])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -79,14 +71,19 @@ export default function Dashboard() {
 
       const { data, error } = await supabase
         .from('visa_profiles')
-        .select('visa_type, program_start_date, program_end_date, university_name, country_of_citizenship')
+        .select('visa_type, program_start_date, program_end_date, university_name, country_of_citizenship, plan_tier, opt_start_date')
         .eq('user_id', user.id)
         .limit(1)
 
       console.log('[dashboard] visa_profiles result:', { data, error })
       if (error) console.log('[dashboard] full error object:', JSON.stringify(error, null, 2))
 
-      setProfile(data?.[0] ?? null)
+      const raw = data?.[0] ?? null
+      const resolved = raw ? { ...raw, plan_tier: raw.plan_tier ?? 'free' } : null
+      setProfile(resolved)
+      if (resolved) {
+        setDeadlines(calculateDeadlines(resolved))
+      }
 
       // Load last 20 chat interactions
       const { data: interactions } = await supabase
@@ -129,22 +126,6 @@ export default function Dashboard() {
     setChatInput('')
     setChatLoading(true)
 
-    // Check escalation client-side first for immediate feedback
-    if (containsEscalationKeyword(text)) {
-      setChatMessages([...updatedMessages, { role: 'assistant', content: '', escalation: true }])
-      setChatLoading(false)
-      const { data: { session: s } } = await supabase.auth.getSession()
-      if (s) {
-        await supabase.from('ai_interactions').insert({
-          user_id: s.user.id,
-          user_message: text,
-          ai_response: 'ESCALATION: This situation requires a licensed immigration attorney.',
-          is_escalation: true,
-        })
-      }
-      return
-    }
-
     const assistantMessage: ChatMessage = { role: 'assistant', content: '' }
     setChatMessages([...updatedMessages, assistantMessage])
 
@@ -163,12 +144,21 @@ export default function Dashboard() {
         }),
       })
 
-      if (res.headers.get('X-Escalation') === 'true') {
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      if (!reader) return
+
+      // Read first chunk to check for escalation marker before streaming to UI
+      const first = await reader.read()
+      const firstChunk = first.done ? '' : decoder.decode(first.value, { stream: true })
+
+      const { data: { session: s } } = await supabase.auth.getSession()
+
+      if (firstChunk === ESCALATION_MARKER) {
         setChatMessages(prev => [
           ...prev.slice(0, -1),
           { role: 'assistant', content: '', escalation: true },
         ])
-        const { data: { session: s } } = await supabase.auth.getSession()
         if (s) {
           await supabase.from('ai_interactions').insert({
             user_id: s.user.id,
@@ -177,15 +167,16 @@ export default function Dashboard() {
             is_escalation: true,
           })
         }
-        setChatLoading(false)
         return
       }
 
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
-      if (!reader) return
+      // Not an escalation — stream the rest progressively
+      let accumulated = firstChunk
+      setChatMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: accumulated },
+      ])
 
-      let accumulated = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -197,7 +188,6 @@ export default function Dashboard() {
       }
 
       // Save completed interaction
-      const { data: { session: s } } = await supabase.auth.getSession()
       if (s && accumulated) {
         await supabase.from('ai_interactions').insert({
           user_id: s.user.id,
@@ -298,12 +288,63 @@ export default function Dashboard() {
                 <p className="text-white font-bold text-sm">{profile.country_of_citizenship}</p>
               </div>
             </div>
-            <div className="mt-5 pt-5 border-t border-white/10">
-              <p className="text-xs font-bold uppercase tracking-widest text-[#5BBFBE] mb-3">View your timeline</p>
-              <p className="text-[#94A3B8] text-sm leading-relaxed">
-                Your personalized deadline calendar is being built. Check back soon — critical dates for your {profile.visa_type} status will appear here.
-              </p>
-            </div>
+          </div>
+        )}
+
+        {/* Deadline timeline */}
+        {profile && (
+          <div className="mb-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Your deadline timeline</p>
+
+            {deadlines.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+                <p className="text-sm text-gray-400">
+                  Deadline tracking for {profile.visa_type} is coming soon.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {deadlines.map((dl, i) => {
+                  const c = deadlineColors(dl.days_until)
+                  const absDays = Math.abs(dl.days_until)
+                  const pillLabel =
+                    dl.days_until === 0
+                      ? 'Today'
+                      : dl.days_until > 0
+                      ? `${absDays}d away`
+                      : `${absDays}d overdue`
+                  const badgeLabel =
+                    dl.status === 'overdue'
+                      ? 'Overdue'
+                      : dl.status === 'urgent'
+                      ? 'Urgent'
+                      : dl.days_until <= 90
+                      ? 'Soon'
+                      : 'Upcoming'
+
+                  return (
+                    <div
+                      key={i}
+                      className={`bg-white border border-gray-200 border-l-4 ${c.border} rounded-xl px-5 py-4 flex items-start justify-between gap-4`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="text-sm font-bold text-[#1B2E4B]">{dl.title}</p>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.badge} ${c.badgeText}`}>
+                            {badgeLabel}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-1">{formatDeadlineDate(dl.date)}</p>
+                        <p className="text-xs text-gray-400 leading-relaxed">{dl.description}</p>
+                      </div>
+                      <div className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap ${c.pill} ${c.pillText}`}>
+                        {pillLabel}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -336,120 +377,167 @@ export default function Dashboard() {
         {profile && (
           <div className="mb-10">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">AI Q&amp;A</p>
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
-              {/* Disclaimer bar */}
-              <div className="bg-[#E6F4F4] border-b border-[#B2DFDF] px-5 py-2.5 flex items-center gap-2">
-                <svg className="w-3.5 h-3.5 text-[#0E7C7B] shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <p className="text-xs text-[#2D6A6A] font-medium">
-                  Information only — not legal advice. Based on official USCIS guidance.
-                </p>
-              </div>
-
-              {/* Messages */}
-              <div className="h-80 overflow-y-auto px-5 py-4 space-y-4">
-                {chatMessages.length === 0 && (
-                  <div className="h-full flex flex-col items-center justify-center text-center gap-3">
-                    <div className="text-3xl">🤖</div>
-                    <p className="text-sm font-medium text-[#1B2E4B]">Ask anything about your {profile.visa_type} status</p>
-                    <p className="text-xs text-gray-400 max-w-xs">
-                      Deadlines, requirements, next steps — answered in plain English based on USCIS guidance.
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center mt-1">
-                      {[
-                        `When does my ${profile.visa_type} expire?`,
-                        'What happens after my program ends?',
-                        'What are my work authorization options?',
-                      ].map(suggestion => (
-                        <button
-                          key={suggestion}
-                          onClick={() => setChatInput(suggestion)}
-                          className="text-xs bg-[#E6F4F4] text-[#0E7C7B] font-medium px-3 py-1.5 rounded-full hover:bg-[#0E7C7B] hover:text-white transition-colors"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
+            {profile.plan_tier === 'free' ? (
+              /* Locked state for free users */
+              <div className="relative rounded-2xl overflow-hidden border border-gray-200">
+                {/* Blurred preview */}
+                <div className="blur-sm pointer-events-none select-none bg-white">
+                  <div className="bg-[#E6F4F4] border-b border-[#B2DFDF] px-5 py-2.5">
+                    <p className="text-xs text-[#2D6A6A] font-medium">Information only — not legal advice. Based on official USCIS guidance.</p>
+                  </div>
+                  <div className="h-48 px-5 py-4 space-y-3">
+                    <div className="flex justify-end"><div className="bg-[#1B2E4B] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[60%]">What is the OPT application window?</div></div>
+                    <div className="flex justify-start"><div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-[75%] text-[#1a1a2e]">You can apply for OPT up to 90 days before your program end date and no later than 60 days after...</div></div>
+                  </div>
+                  <div className="border-t border-gray-100 px-4 py-3">
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-gray-100 rounded-xl h-10" />
+                      <div className="bg-[#0E7C7B] rounded-xl w-12 h-10" />
                     </div>
                   </div>
-                )}
-
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {msg.escalation ? (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-[90%]">
-                        <div className="flex items-start gap-3">
-                          <span className="text-lg">⚖️</span>
-                          <div>
-                            <p className="text-sm font-bold text-amber-800 mb-1">Attorney consultation required</p>
-                            <p className="text-xs text-amber-700 leading-relaxed">
-                              Your question involves a situation — such as an RFE, visa denial, unauthorized employment, status gap, or removal proceedings — that requires a licensed immigration attorney. StatusAnchor cannot provide guidance on these matters.
-                            </p>
-                            <Link
-                              href="/upgrade"
-                              className="inline-flex items-center gap-1.5 mt-3 bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-800 transition-colors"
-                            >
-                              Find an attorney near you →
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-[#1B2E4B] text-white rounded-br-sm'
-                          : 'bg-gray-100 text-[#1a1a2e] rounded-bl-sm prose prose-sm max-w-none'
-                      }`}>
-                        {msg.content
-                          ? msg.role === 'assistant'
-                            ? <ReactMarkdown
-                                components={{
-                                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                                  strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                                  code: ({ children }) => <code className="bg-black/10 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
-                                }}
-                              >{msg.content}</ReactMarkdown>
-                            : msg.content
-                          : (chatLoading && i === chatMessages.length - 1
-                            ? <span className="inline-flex gap-1 items-center"><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}} /></span>
-                            : null)}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input */}
-              <div className="border-t border-gray-100 px-4 py-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    placeholder="Ask about your visa status, deadlines, next steps…"
-                    className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 text-[#1a1a2e] placeholder-gray-400 focus:outline-none focus:border-[#0E7C7B] focus:ring-1 focus:ring-[#0E7C7B] transition-colors"
-                    disabled={chatLoading}
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={chatLoading || !chatInput.trim()}
-                    className="bg-[#0E7C7B] text-white px-4 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                </div>
+                {/* Upgrade overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-[2px] px-6 text-center">
+                  <div className="text-3xl mb-3">🔒</div>
+                  <p className="text-sm font-bold text-[#1B2E4B] mb-1">AI Q&amp;A is a Core feature</p>
+                  <p className="text-xs text-gray-500 mb-4 max-w-xs">
+                    Ask anything about your visa status and get plain-English answers based on official USCIS guidance.
+                  </p>
+                  <Link
+                    href="/upgrade"
+                    className="bg-[#0E7C7B] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                    </svg>
-                  </button>
+                    Upgrade to Core to unlock AI Q&amp;A — from $9/mo
+                  </Link>
                 </div>
               </div>
+            ) : (
+              /* Full chat for core / pro users */
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
-            </div>
+                {/* Disclaimer bar */}
+                <div className="bg-[#E6F4F4] border-b border-[#B2DFDF] px-5 py-2.5 flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-[#0E7C7B] shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-[#2D6A6A] font-medium">
+                    Information only — not legal advice. Based on official USCIS guidance.
+                  </p>
+                </div>
+
+                {/* Messages */}
+                <div className="h-80 overflow-y-auto px-5 py-4 space-y-4">
+                  {chatMessages.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-center gap-3">
+                      <div className="text-3xl">🤖</div>
+                      <p className="text-sm font-medium text-[#1B2E4B]">Ask anything about your {profile.visa_type} status</p>
+                      <p className="text-xs text-gray-400 max-w-xs">
+                        Deadlines, requirements, next steps — answered in plain English based on USCIS guidance.
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center mt-1">
+                        {[
+                          `When does my ${profile.visa_type} expire?`,
+                          'What happens after my program ends?',
+                          'What are my work authorization options?',
+                        ].map(suggestion => (
+                          <button
+                            key={suggestion}
+                            onClick={() => setChatInput(suggestion)}
+                            className="text-xs bg-[#E6F4F4] text-[#0E7C7B] font-medium px-3 py-1.5 rounded-full hover:bg-[#0E7C7B] hover:text-white transition-colors"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      {msg.escalation ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-[90%]">
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg">⚖️</span>
+                            <div>
+                              <p className="text-sm font-bold text-amber-800 mb-1">Attorney consultation required</p>
+                              <p className="text-xs text-amber-700 leading-relaxed">
+                                Your question involves a situation — such as an RFE, visa denial, unauthorized employment, status gap, or removal proceedings — that requires a licensed immigration attorney. StatusAnchor cannot provide guidance on these matters.
+                              </p>
+                              {profile.plan_tier === 'pro' ? (
+                                <Link
+                                  href="/upgrade"
+                                  className="inline-flex items-center gap-1.5 mt-3 bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-800 transition-colors"
+                                >
+                                  Find an attorney near you →
+                                </Link>
+                              ) : (
+                                <Link
+                                  href="/upgrade"
+                                  className="inline-flex items-center gap-1.5 mt-3 bg-[#0E7C7B] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#1B2E4B] transition-colors"
+                                >
+                                  Upgrade to Pro — $29/mo
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                          msg.role === 'user'
+                            ? 'bg-[#1B2E4B] text-white rounded-br-sm'
+                            : 'bg-gray-100 text-[#1a1a2e] rounded-bl-sm prose prose-sm max-w-none'
+                        }`}>
+                          {msg.content
+                            ? msg.role === 'assistant'
+                              ? <ReactMarkdown
+                                  components={{
+                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                                    strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                    code: ({ children }) => <code className="bg-black/10 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+                                  }}
+                                >{msg.content}</ReactMarkdown>
+                              : msg.content
+                            : (chatLoading && i === chatMessages.length - 1
+                              ? <span className="inline-flex gap-1 items-center"><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}} /></span>
+                              : null)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="border-t border-gray-100 px-4 py-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      placeholder="Ask about your visa status, deadlines, next steps…"
+                      className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 text-[#1a1a2e] placeholder-gray-400 focus:outline-none focus:border-[#0E7C7B] focus:ring-1 focus:ring-[#0E7C7B] transition-colors"
+                      disabled={chatLoading}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={chatLoading || !chatInput.trim()}
+                      className="bg-[#0E7C7B] text-white px-4 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )}
           </div>
         )}
 

@@ -3,20 +3,7 @@ import { NextRequest } from 'next/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const ESCALATION_KEYWORDS = [
-  'rfe', 'request for evidence',
-  'denial', 'denied', 'visa denial',
-  'unauthorized employment', 'unauthorized work',
-  'worked before my ead', 'worked without ead', 'worked before ead',
-  'status gap', 'gap in my status', 'gap in status', 'out of status', 'unlawful presence',
-  'deportation', 'removal', 'deported',
-  'revoked', 'visa revoked', 'h-1b revoked', 'petition revoked',
-]
-
-function containsEscalationKeyword(text: string): boolean {
-  const lower = text.toLowerCase()
-  return ESCALATION_KEYWORDS.some(kw => lower.includes(kw))
-}
+const ESCALATION_SENTINEL = '{"escalate":true}'
 
 function buildSystemPrompt(profile: {
   visa_type?: string
@@ -47,38 +34,28 @@ CRITICAL RULES:
 7. BREVITY: Keep responses concise — 3 to 5 sentences for simple questions. Do not dump everything at once. End with "Want more details?" if there is more relevant information you could share. Only expand if the user asks for more.
 ${profileContext}
 
-ESCALATION: If the user's message contains any of the following situations — RFE (Request for Evidence), visa denial, unauthorized employment, status gaps, unlawful presence, or deportation/removal proceedings — do not attempt to answer. Instead, immediately flag that this situation requires a licensed immigration attorney.`
+ESCALATION RULE — read carefully:
+Before answering, evaluate whether the user is describing a personal, active legal emergency — meaning they are personally experiencing RIGHT NOW one of: receiving an RFE, having their visa denied, having a status gap or period of unlawful presence, or being in removal/deportation proceedings.
+
+- If YES (personal emergency): respond ONLY with the exact text: {"escalate":true} — nothing else, no explanation.
+- If NO (general question, hypothetical, asking how something works, asking what an RFE is, asking about someone else's situation, or asking what to do in a scenario they haven't confirmed is their own): answer normally with helpful USCIS-based information.
+
+Examples that should NOT escalate: "What is an RFE?", "How does the appeals process work?", "What happens if someone misses an OPT deadline?", "Can an H-1B be revoked?"
+Examples that SHOULD escalate: "I received an RFE", "My visa was denied", "I think I have a gap in my status", "I got a notice to appear", "I've been working without authorization"`
 }
 
 export async function POST(req: NextRequest) {
   const { messages, profile } = await req.json()
 
-  const lastUserMessage: string = messages[messages.length - 1]?.content ?? ''
-
-  // Check for escalation keywords in latest user message
-  if (containsEscalationKeyword(lastUserMessage)) {
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      start(controller) {
-        const escalationMsg = 'ESCALATION: Your message mentions a situation that goes beyond general immigration information — this requires a licensed immigration attorney. StatusAnchor cannot provide guidance on RFEs, visa denials, unauthorized employment, status gaps, or removal proceedings. Please consult a qualified immigration attorney immediately.'
-        controller.enqueue(encoder.encode(escalationMsg))
-        controller.close()
-      },
-    })
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'X-Escalation': 'true',
-      },
-    })
-  }
-
   const systemPrompt = buildSystemPrompt(profile)
 
-  const anthropicMessages: Anthropic.MessageParam[] = messages.map((m: { role: string; content: string }) => ({
-    role: m.role as 'user' | 'assistant',
-    content: m.content,
-  }))
+  const anthropicMessages: Anthropic.MessageParam[] = messages.map(
+    (m: { role: string; content: string }) => ({
+      role: m.role as 'user' | 'assistant',
+      // Strip escalation placeholder text from history so Claude sees clean context
+      content: m.content === '' ? '[escalation]' : m.content,
+    })
+  )
 
   try {
     const stream = await client.messages.stream({
@@ -89,16 +66,49 @@ export async function POST(req: NextRequest) {
     })
 
     const encoder = new TextEncoder()
+
+    // Buffer the start of the stream to detect the escalation sentinel
+    // before committing to streaming the response to the client.
     const readable = new ReadableStream({
       async start(controller) {
+        let buffer = ''
+        let sentinelChecked = false
+
         try {
           for await (const event of stream) {
             if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(encoder.encode(event.delta.text))
+              event.type !== 'content_block_delta' ||
+              event.delta.type !== 'text_delta'
+            ) continue
+
+            const chunk = event.delta.text
+
+            if (!sentinelChecked) {
+              buffer += chunk
+              // Wait until we have enough chars to know if it's the sentinel
+              if (buffer.length < ESCALATION_SENTINEL.length) continue
+
+              sentinelChecked = true
+
+              if (buffer.trimStart().startsWith('{"escalate":true}')) {
+                // Signal escalation via a custom header isn't possible mid-stream,
+                // so we write a special marker the client knows to intercept.
+                controller.enqueue(encoder.encode('\x00ESCALATE\x00'))
+                controller.close()
+                return
+              }
+
+              // Not an escalation — flush buffer and continue streaming
+              controller.enqueue(encoder.encode(buffer))
+              buffer = ''
+            } else {
+              controller.enqueue(encoder.encode(chunk))
             }
+          }
+
+          // Stream ended before we hit sentinel length — flush any remaining buffer
+          if (!sentinelChecked && buffer) {
+            controller.enqueue(encoder.encode(buffer))
           }
         } catch (streamErr) {
           console.error('[chat] stream error:', streamErr)
@@ -110,10 +120,7 @@ export async function POST(req: NextRequest) {
     })
 
     return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'X-Escalation': 'false',
-      },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     })
   } catch (err) {
     console.error('[chat] Anthropic API error:', err)
