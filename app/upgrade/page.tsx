@@ -3,22 +3,30 @@
 import Link from 'next/link'
 
 const coreFeatures = [
-  'Full AI Q&A in plain English',
-  'Deadline tracking for your visa type',
-  'Document checklist',
+  'AI Q&A in plain English (information, not legal advice)',
+  'System-calculated deadline tracking',
+  'Personalized document checklist',
   'Critical date alerts',
   'USCIS processing time tracker',
   'Weekly Visa Health Check emails',
+  'When to involve an attorney — clearly flagged',
 ]
 
 const proFeatures = [
   'Everything in Core',
-  'Attorney referral directory',
-  'Find an immigration attorney near you',
+  'Attorney referral access (pre-qualified, context-aware)',
   'Priority support',
   'Multiple visa types',
   'Policy change alerts',
 ]
+
+function CheckIcon() {
+  return (
+    <svg className="w-4 h-4 text-[#0E7C7B] shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    </svg>
+  )
+}
 
 export default function Upgrade() {
   return (
@@ -40,41 +48,39 @@ export default function Upgrade() {
         <div className="text-center mb-12">
           <p className="text-xs font-bold uppercase tracking-widest text-[#0E7C7B] mb-3">Upgrade</p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-4">
-            Know exactly where you stand.
+            Stop guessing. Know exactly where you stand.
           </h1>
           <p className="text-gray-500 text-sm max-w-md mx-auto leading-relaxed">
             Less than one minute of an attorney&apos;s time. Cancel anytime.
           </p>
-
-          <div className="inline-flex items-center gap-2 bg-[#E6F4F4] text-[#0E7C7B] text-xs font-bold px-4 py-2 rounded-full mt-5">
-            🎓 Students save $5/mo with a .edu email
-          </div>
         </div>
 
         {/* Pricing cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
 
           {/* Core */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-8">
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Core</p>
-            <div className="flex items-end gap-1 mb-1">
-              <span className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight line-through text-gray-300">$14</span>
-              <span className="text-base font-medium text-gray-300 mb-1">/mo</span>
+
+            {/* Pricing */}
+            <div className="mb-1">
+              <span className="text-4xl font-extrabold text-gray-300 line-through tracking-tight">$14</span>
+              <span className="text-base font-medium text-gray-300">/mo</span>
             </div>
-            <div className="flex items-end gap-1 mb-1">
+            <div className="flex items-end gap-1.5 mb-1">
               <span className="text-4xl font-extrabold text-[#0E7C7B] tracking-tight">$9</span>
               <span className="text-base font-medium text-gray-400 mb-1">/mo</span>
-              <span className="text-xs font-bold text-[#0E7C7B] mb-1.5 ml-1">Student price</span>
+              <span className="text-xs font-bold text-[#0E7C7B] mb-1.5">Student price</span>
             </div>
-            <p className="text-xs text-gray-400 mb-1">Use your .edu email at signup and student pricing applies automatically.</p>
-            <p className="text-sm text-gray-400 mt-3 mb-6">For students and visa holders who need clarity.</p>
 
-            <ul className="space-y-3 mb-8">
+            <p className="text-sm text-gray-500 mt-3 mb-6 leading-relaxed">
+              For students and visa holders who want clarity without paying for an attorney.
+            </p>
+
+            <ul className="space-y-3 mb-8 flex-1">
               {coreFeatures.map(f => (
                 <li key={f} className="flex items-start gap-2.5 text-sm text-[#1a1a2e]">
-                  <svg className="w-4 h-4 text-[#0E7C7B] shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon />
                   {f}
                 </li>
               ))}
@@ -82,15 +88,14 @@ export default function Upgrade() {
 
             <a
               href="/api/stripe/checkout?plan=core"
-              className="block text-center py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-[#1B2E4B] hover:border-[#0E7C7B] transition-colors"
+              className="block text-center py-3 rounded-xl bg-[#1B2E4B] text-white font-bold text-sm hover:bg-[#0E7C7B] transition-colors"
             >
-              Get Core — $9/mo
+              Start Core — from $9/mo
             </a>
           </div>
 
           {/* Pro */}
-          <div className="bg-white border-2 border-[#0E7C7B] rounded-2xl p-8 relative shadow-sm">
-            {/* Most Popular badge */}
+          <div className="bg-white border-2 border-[#0E7C7B] rounded-2xl p-8 relative shadow-sm flex flex-col">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0E7C7B] text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap uppercase tracking-wide">
               Most Popular
             </div>
@@ -100,14 +105,15 @@ export default function Upgrade() {
               <span className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight">$29</span>
               <span className="text-base font-medium text-gray-400 mb-1">/mo</span>
             </div>
-            <p className="text-sm text-gray-400 mb-6">For complex situations and transitions.</p>
 
-            <ul className="space-y-3 mb-8">
+            <p className="text-sm text-gray-500 mt-3 mb-6 leading-relaxed">
+              For complex situations, transitions, and higher-stakes timelines.
+            </p>
+
+            <ul className="space-y-3 mb-8 flex-1">
               {proFeatures.map(f => (
                 <li key={f} className="flex items-start gap-2.5 text-sm text-[#1a1a2e]">
-                  <svg className="w-4 h-4 text-[#0E7C7B] shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon />
                   {f}
                 </li>
               ))}
@@ -117,17 +123,30 @@ export default function Upgrade() {
               href="/api/stripe/checkout?plan=pro"
               className="block text-center py-3 rounded-xl bg-[#0E7C7B] text-white font-bold text-sm hover:bg-[#1B2E4B] transition-colors"
             >
-              Get Pro — $29/mo
+              Upgrade to Pro — $29/mo
             </a>
           </div>
 
         </div>
 
-        {/* Disclaimer */}
+        {/* Student pricing banner */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <span className="text-base">🎓</span>
+          <p className="text-sm text-[#0E7C7B] font-semibold">
+            Student pricing applied automatically with a .edu email.
+          </p>
+        </div>
+
+        {/* Trust line */}
+        <p className="text-center text-xs text-gray-400 mb-10">
+          No contracts. Cancel anytime. Your data stays yours.
+        </p>
+
+        {/* Footer disclaimer */}
         <div className="bg-[#E6F4F4] border border-[#B2DFDF] rounded-xl p-5 flex gap-3">
           <span className="text-base mt-0.5">ℹ️</span>
           <p className="text-xs text-[#2D6A6A] leading-relaxed">
-            StatusAnchor provides general immigration information derived from publicly available USCIS guidance — not legal advice. Attorney referrals are provided as a directory service only. No attorney-client relationship is formed through use of this platform. When in doubt, consult a licensed immigration attorney.
+            Attorney referrals are provided as a directory service — not a recommendation or legal advice. StatusAnchor is not a law firm. No attorney-client relationship is formed through use of this platform.
           </p>
         </div>
 
