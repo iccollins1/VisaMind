@@ -88,6 +88,26 @@ export default function Dashboard() {
       if (error) console.log('[dashboard] full error object:', JSON.stringify(error, null, 2))
 
       setProfile(data?.[0] ?? null)
+
+      // Load last 20 chat interactions
+      const { data: interactions } = await supabase
+        .from('ai_interactions')
+        .select('user_message, ai_response, is_escalation, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(20)
+
+      if (interactions && interactions.length > 0) {
+        const restored: ChatMessage[] = []
+        for (const row of interactions) {
+          restored.push({ role: 'user', content: row.user_message })
+          restored.push({ role: 'assistant', content: row.ai_response })
+        }
+        setChatMessages(restored)
+        const lastRow = interactions[interactions.length - 1]
+        if (lastRow.is_escalation) setEscalated(true)
+      }
+
       setProfileLoaded(true)
     }
     load()
@@ -116,6 +136,15 @@ export default function Dashboard() {
     if (containsEscalationKeyword(text)) {
       setEscalated(true)
       setChatLoading(false)
+      const { data: { session: s } } = await supabase.auth.getSession()
+      if (s) {
+        await supabase.from('ai_interactions').insert({
+          user_id: s.user.id,
+          user_message: text,
+          ai_response: 'ESCALATION: This situation requires a licensed immigration attorney.',
+          is_escalation: true,
+        })
+      }
       return
     }
 
@@ -139,7 +168,16 @@ export default function Dashboard() {
 
       if (res.headers.get('X-Escalation') === 'true') {
         setEscalated(true)
-        setChatMessages(prev => prev.slice(0, -1)) // remove empty assistant message
+        setChatMessages(prev => prev.slice(0, -1))
+        const { data: { session: s } } = await supabase.auth.getSession()
+        if (s) {
+          await supabase.from('ai_interactions').insert({
+            user_id: s.user.id,
+            user_message: text,
+            ai_response: 'ESCALATION: This situation requires a licensed immigration attorney.',
+            is_escalation: true,
+          })
+        }
         setChatLoading(false)
         return
       }
@@ -157,6 +195,17 @@ export default function Dashboard() {
           ...prev.slice(0, -1),
           { role: 'assistant', content: accumulated },
         ])
+      }
+
+      // Save completed interaction
+      const { data: { session: s } } = await supabase.auth.getSession()
+      if (s && accumulated) {
+        await supabase.from('ai_interactions').insert({
+          user_id: s.user.id,
+          user_message: text,
+          ai_response: accumulated,
+          is_escalation: false,
+        })
       }
     } catch {
       setChatMessages(prev => [
