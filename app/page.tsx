@@ -26,10 +26,10 @@ export default function Home() {
           For F-1, OPT, H-1B & more
         </div>
         <h1 className="text-5xl md:text-6xl font-extrabold text-[#1B2E4B] leading-tight tracking-tight mb-6">
-          Never miss a visa deadline <span className="text-[#0E7C7B]">again.</span>
+          Know exactly where you stand. <span className="text-[#0E7C7B]">Never miss what matters.</span>
         </h1>
         <p className="text-lg text-gray-500 max-w-xl mx-auto mb-10 leading-relaxed">
-          StatusAnchor tracks your immigration timeline, explains every deadline in plain English, and tells you exactly when you need a real attorney — before it&apos;s too late.
+          StatusAnchor maps your immigration timeline, explains every deadline in plain English, and shows you when it&apos;s time to involve a real attorney — before it&apos;s too late.
         </p>
         <div className="flex flex-wrap gap-4 justify-center mb-5">
           <Link href="/signup" className="bg-[#0E7C7B] text-white font-bold px-8 py-3.5 rounded-xl hover:bg-[#1B2E4B] transition-colors text-base">
@@ -46,9 +46,9 @@ export default function Home() {
       <div className="bg-white border-y border-gray-200 py-5 px-6">
         <div className="max-w-4xl mx-auto flex flex-wrap justify-center gap-8">
           {[
-            'Based on official USCIS guidance',
-            'Information only — not legal advice',
-            'Attorney escalation built in',
+            'Built on official USCIS guidance',
+            'Information only — never legal advice',
+            'Attorney escalation when it matters',
             'Documents encrypted & secure',
           ].map(item => (
             <div key={item} className="flex items-center gap-2 text-sm text-gray-500 font-medium">
@@ -73,7 +73,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[
             { icon: '📋', title: 'Deadlines buried in jargon', body: 'USCIS notices are written for attorneys, not students. Most people don\'t know what they\'re looking at until it\'s too late.' },
-            { icon: '💸', title: 'Attorneys cost $300/hr', body: 'For questions that take 5 minutes to answer. Most international students can\'t afford to ask every time they\'re unsure.' },
+            { icon: '💸', title: 'Attorneys cost $300/hr', body: 'For questions that should take 5 minutes to answer. Most international students can\'t afford to ask every time they\'re unsure.' },
             { icon: '😰', title: 'No one tells you what\'s next', body: 'Your I-20 doesn\'t come with a roadmap. Your DSO is overloaded. Google gives you forums from 2019.' },
             { icon: '⏰', title: 'Deadlines don\'t wait', body: 'Miss your OPT application window by one day and you lose 12 months of work authorization. There is no grace period.' },
           ].map(c => (
@@ -92,7 +92,10 @@ export default function Home() {
           <p className="text-xs font-bold uppercase tracking-widest text-[#0E7C7B] mb-3">How it works</p>
           <h2 className="text-3xl md:text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-4">Your timeline in 5 minutes.</h2>
           <p className="text-gray-500 max-w-xl mb-10 leading-relaxed">
-            Input your details once. StatusAnchor maps every critical date, tracks every deadline, and tells you exactly when you need a real attorney.
+            Input your details once. StatusAnchor maps every critical date, tracks every deadline, and shows you when it&apos;s time to involve a real attorney.
+          </p>
+          <p className="text-xs text-[#0E7C7B] font-semibold max-w-xl mb-10 -mt-6 leading-relaxed">
+            Every timeline is calculated from official USCIS rules based on your inputs — not guesses, not opinions.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
@@ -115,7 +118,7 @@ export default function Home() {
       <section id="pricing" className="max-w-4xl mx-auto px-6 py-16">
         <p className="text-xs font-bold uppercase tracking-widest text-[#0E7C7B] mb-3">Pricing</p>
         <h2 className="text-3xl md:text-4xl font-extrabold text-[#1B2E4B] tracking-tight mb-4">Start free. Upgrade when you&apos;re ready.</h2>
-        <p className="text-gray-500 mb-10">Less than one minute of attorney time. Cancel anytime.</p>
+        <p className="text-gray-500 mb-10">Less than one minute of an attorney&apos;s time. Cancel anytime.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Free */}
           <div className="bg-white border border-gray-200 rounded-2xl p-7">
@@ -181,8 +184,8 @@ export default function Home() {
 
       {/* CTA */}
       <section className="bg-[#1B2E4B] py-20 px-6 text-center">
-        <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-4">Know exactly where you stand.</h2>
-        <p className="text-[#94A3B8] mb-8 max-w-md mx-auto">Join international students and workers who stopped guessing and started tracking.</p>
+        <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-4">Stop guessing. Know exactly where you stand.</h2>
+        <p className="text-[#94A3B8] mb-8 max-w-md mx-auto">Join international students and workers who track their status, not just hope they got it right.</p>
         <Link href="/signup" className="inline-flex bg-[#0E7C7B] text-white font-bold px-8 py-3.5 rounded-xl hover:bg-white hover:text-[#1B2E4B] transition-colors">
           Get your free timeline →
         </Link>
