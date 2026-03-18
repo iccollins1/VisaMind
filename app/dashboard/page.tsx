@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -36,11 +36,30 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+type ChatMessage = { role: 'user' | 'assistant'; content: string }
+
+const ESCALATION_KEYWORDS = [
+  'rfe', 'request for evidence', 'denial', 'denied', 'visa denial',
+  'unauthorized employment', 'unauthorized work', 'status gap',
+  'out of status', 'unlawful presence', 'deportation', 'removal', 'deported',
+]
+
+function containsEscalationKeyword(text: string) {
+  const lower = text.toLowerCase()
+  return ESCALATION_KEYWORDS.some(kw => lower.includes(kw))
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [profile, setProfile] = useState<VisaProfile | null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [escalated, setEscalated] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -73,6 +92,76 @@ export default function Dashboard() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/signin')
+  }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
+
+  const sendMessage = async () => {
+    const text = chatInput.trim()
+    if (!text || chatLoading || escalated) return
+
+    const userMessage: ChatMessage = { role: 'user', content: text }
+    const updatedMessages = [...chatMessages, userMessage]
+    setChatMessages(updatedMessages)
+    setChatInput('')
+    setChatLoading(true)
+
+    // Check escalation client-side first for immediate feedback
+    if (containsEscalationKeyword(text)) {
+      setEscalated(true)
+      setChatLoading(false)
+      return
+    }
+
+    const assistantMessage: ChatMessage = { role: 'assistant', content: '' }
+    setChatMessages([...updatedMessages, assistantMessage])
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          profile: profile ? {
+            visa_type: profile.visa_type,
+            program_start_date: profile.program_start_date,
+            program_end_date: profile.program_end_date,
+            country_of_citizenship: profile.country_of_citizenship,
+          } : null,
+        }),
+      })
+
+      if (res.headers.get('X-Escalation') === 'true') {
+        setEscalated(true)
+        setChatMessages(prev => prev.slice(0, -1)) // remove empty assistant message
+        setChatLoading(false)
+        return
+      }
+
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      if (!reader) return
+
+      let accumulated = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        accumulated += decoder.decode(value, { stream: true })
+        setChatMessages(prev => [
+          ...prev.slice(0, -1),
+          { role: 'assistant', content: accumulated },
+        ])
+      }
+    } catch {
+      setChatMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: 'Something went wrong. Please try again.' },
+      ])
+    } finally {
+      setChatLoading(false)
+    }
   }
 
   if (!email || !profileLoaded) return null
@@ -190,6 +279,116 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+
+        {/* AI Q&A Chat */}
+        {profile && (
+          <div className="mb-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">AI Q&amp;A</p>
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+
+              {/* Disclaimer bar */}
+              <div className="bg-[#E6F4F4] border-b border-[#B2DFDF] px-5 py-2.5 flex items-center gap-2">
+                <svg className="w-3.5 h-3.5 text-[#0E7C7B] shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <p className="text-xs text-[#2D6A6A] font-medium">
+                  Information only — not legal advice. Based on official USCIS guidance.
+                </p>
+              </div>
+
+              {/* Messages */}
+              <div className="h-80 overflow-y-auto px-5 py-4 space-y-4">
+                {chatMessages.length === 0 && !escalated && (
+                  <div className="h-full flex flex-col items-center justify-center text-center gap-3">
+                    <div className="text-3xl">🤖</div>
+                    <p className="text-sm font-medium text-[#1B2E4B]">Ask anything about your {profile.visa_type} status</p>
+                    <p className="text-xs text-gray-400 max-w-xs">
+                      Deadlines, requirements, next steps — answered in plain English based on USCIS guidance.
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center mt-1">
+                      {[
+                        `When does my ${profile.visa_type} expire?`,
+                        'What happens after my program ends?',
+                        'What are my work authorization options?',
+                      ].map(suggestion => (
+                        <button
+                          key={suggestion}
+                          onClick={() => setChatInput(suggestion)}
+                          className="text-xs bg-[#E6F4F4] text-[#0E7C7B] font-medium px-3 py-1.5 rounded-full hover:bg-[#0E7C7B] hover:text-white transition-colors"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                      msg.role === 'user'
+                        ? 'bg-[#1B2E4B] text-white rounded-br-sm'
+                        : 'bg-gray-100 text-[#1a1a2e] rounded-bl-sm'
+                    }`}>
+                      {msg.content || (chatLoading && i === chatMessages.length - 1
+                        ? <span className="inline-flex gap-1 items-center"><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}} /><span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}} /></span>
+                        : null)}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Escalation message */}
+                {escalated && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">⚖️</span>
+                      <div>
+                        <p className="text-sm font-bold text-amber-800 mb-1">Attorney consultation required</p>
+                        <p className="text-xs text-amber-700 leading-relaxed">
+                          Your question involves a situation — such as an RFE, visa denial, unauthorized employment, status gap, or removal proceedings — that requires a licensed immigration attorney. StatusAnchor cannot provide guidance on these matters.
+                        </p>
+                        <p className="text-xs text-amber-700 font-semibold mt-2">Please consult a qualified immigration attorney immediately.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="border-t border-gray-100 px-4 py-3">
+                {escalated ? (
+                  <p className="text-xs text-center text-gray-400 py-1">
+                    Chat locked — please consult an immigration attorney for your situation.
+                  </p>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      placeholder="Ask about your visa status, deadlines, next steps…"
+                      className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 text-[#1a1a2e] placeholder-gray-400 focus:outline-none focus:border-[#0E7C7B] focus:ring-1 focus:ring-[#0E7C7B] transition-colors"
+                      disabled={chatLoading}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={chatLoading || !chatInput.trim()}
+                      className="bg-[#0E7C7B] text-white px-4 py-2.5 rounded-xl hover:bg-[#1B2E4B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )}
 
         {/* Disclaimer */}
         <div className="bg-[#E6F4F4] border border-[#B2DFDF] rounded-xl p-5 flex gap-3">
