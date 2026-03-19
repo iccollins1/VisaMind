@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createClient } from '@supabase/supabase-js'
 
 // Called by a cron job (e.g. Vercel Cron, GitHub Actions, cron-job.org).
 // Requires: Authorization: Bearer <CRON_SECRET>
@@ -9,10 +9,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('[reset-questions] missing Supabase env vars')
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 })
+  }
+
+  // Initialize inside the handler so missing env vars fail gracefully at runtime
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // 30 days ago — profiles reset_date older than this need resetting
+  // 30 days ago — profiles whose reset_date is older than this need resetting
   const cutoff = new Date(today)
   cutoff.setDate(today.getDate() - 30)
   const cutoffStr = cutoff.toISOString().split('T')[0]
