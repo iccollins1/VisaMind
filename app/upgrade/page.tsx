@@ -32,25 +32,33 @@ function CheckIcon() {
 
 export default function Upgrade() {
   const [loading, setLoading] = useState<'core' | 'pro' | null>(null)
+  const [error, setError] = useState('')
 
   async function startCheckout(plan: 'core' | 'pro') {
     setLoading(plan)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      window.location.href = '/signin'
-      return
-    }
-    const res = await fetch('/api/stripe/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email: session.user.email, userId: session.user.id }),
-    })
-    if (!res.ok) {
+    setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        window.location.href = '/signin'
+        return
+      }
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, email: session.user.email, userId: session.user.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Something went wrong. Please try again.')
+        setLoading(null)
+        return
+      }
+      window.location.href = data.url
+    } catch (err) {
+      setError('Something went wrong. Please try again.')
       setLoading(null)
-      return
     }
-    const { url } = await res.json()
-    window.location.href = url
   }
 
   return (
@@ -78,6 +86,12 @@ export default function Upgrade() {
             Less than one minute of an attorney&apos;s time. Cancel anytime.
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600 text-center">
+            {error}
+          </div>
+        )}
 
         {/* Pricing cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
