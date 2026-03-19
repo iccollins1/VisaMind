@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 const coreFeatures = [
   'AI Q&A in plain English (information, not legal advice)',
@@ -29,6 +31,27 @@ function CheckIcon() {
 }
 
 export default function Upgrade() {
+  const [loading, setLoading] = useState<'core' | 'pro' | null>(null)
+
+  async function startCheckout(plan: 'core' | 'pro') {
+    setLoading(plan)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      window.location.href = '/signin'
+      return
+    }
+    const res = await fetch(`/api/stripe/checkout?plan=${plan}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    if (!res.ok) {
+      if (res.status === 401) { window.location.href = '/signin'; return }
+      setLoading(null)
+      return
+    }
+    const { url } = await res.json()
+    window.location.href = url
+  }
+
   return (
     <div className="min-h-screen bg-[#F9F7F4] text-[#1a1a2e]">
 
@@ -86,12 +109,13 @@ export default function Upgrade() {
               ))}
             </ul>
 
-            <a
-              href="/api/stripe/checkout?plan=core"
-              className="block text-center py-3 rounded-xl bg-[#1B2E4B] text-white font-bold text-sm hover:bg-[#0E7C7B] transition-colors"
+            <button
+              onClick={() => startCheckout('core')}
+              disabled={loading !== null}
+              className="block w-full text-center py-3 rounded-xl bg-[#1B2E4B] text-white font-bold text-sm hover:bg-[#0E7C7B] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Start Core — from $9/mo
-            </a>
+              {loading === 'core' ? 'Redirecting…' : 'Start Core — from $9/mo'}
+            </button>
           </div>
 
           {/* Pro */}
@@ -119,12 +143,13 @@ export default function Upgrade() {
               ))}
             </ul>
 
-            <a
-              href="/api/stripe/checkout?plan=pro"
-              className="block text-center py-3 rounded-xl bg-[#0E7C7B] text-white font-bold text-sm hover:bg-[#1B2E4B] transition-colors"
+            <button
+              onClick={() => startCheckout('pro')}
+              disabled={loading !== null}
+              className="block w-full text-center py-3 rounded-xl bg-[#0E7C7B] text-white font-bold text-sm hover:bg-[#1B2E4B] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Upgrade to Pro — $29/mo
-            </a>
+              {loading === 'pro' ? 'Redirecting…' : 'Upgrade to Pro — $29/mo'}
+            </button>
           </div>
 
         </div>

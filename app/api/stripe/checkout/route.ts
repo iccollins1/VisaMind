@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 
 const PRICE_IDS = {
   core: 'price_1TCf0FRylgop7izKwRHggWSk',
@@ -15,27 +14,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
   }
 
-  // Get the authenticated user
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: () => {},
-      },
-    }
-  )
-
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    const signinUrl = new URL('/signin', req.url)
-    return NextResponse.redirect(signinUrl)
+  // Read the JWT from the Authorization header sent by the client
+  const authHeader = req.headers.get('authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const email = session.user.email ?? ''
-  const userId = session.user.id
+  // Verify the token and get the user
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const email = user.email ?? ''
+  const userId = user.id
 
   // Detect .edu for student pricing on Core plan
   const isStudent = plan === 'core' && email.toLowerCase().endsWith('.edu')
@@ -60,5 +57,5 @@ export async function GET(req: NextRequest) {
     metadata: { user_id: userId, plan },
   })
 
-  return NextResponse.redirect(checkoutSession.url!)
+  return NextResponse.json({ url: checkoutSession.url })
 }
