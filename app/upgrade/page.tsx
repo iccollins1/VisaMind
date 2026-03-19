@@ -40,11 +40,12 @@ export default function Upgrade() {
       window.location.href = '/signin'
       return
     }
-    const res = await fetch(`/api/stripe/checkout?plan=${plan}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+    const res = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan, email: session.user.email, userId: session.user.id }),
     })
     if (!res.ok) {
-      if (res.status === 401) { window.location.href = '/signin'; return }
       setLoading(null)
       return
     }
@@ -82,7 +83,10 @@ export default function Upgrade() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
 
           {/* Core */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col">
+          <div className="bg-white border-2 border-[#0E7C7B] rounded-2xl p-8 relative shadow-sm flex flex-col">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0E7C7B] text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap uppercase tracking-wide">
+              Most Popular
+            </div>
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Core</p>
 
             {/* Pricing */}
@@ -119,11 +123,7 @@ export default function Upgrade() {
           </div>
 
           {/* Pro */}
-          <div className="bg-white border-2 border-[#0E7C7B] rounded-2xl p-8 relative shadow-sm flex flex-col">
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0E7C7B] text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap uppercase tracking-wide">
-              Most Popular
-            </div>
-
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Pro</p>
             <div className="flex items-end gap-1 mb-1">
               <span className="text-4xl font-extrabold text-[#1B2E4B] tracking-tight">$29</span>
