@@ -48,19 +48,16 @@ export default function Onboarding() {
     setError('')
     setLoading(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    // Use getSession() — works reliably in client components without a
+    // network round-trip, unlike getUser() which can silently return null.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      console.error('[onboarding] no session — redirecting to signin')
       router.push('/signin')
       return
     }
-
-    // Check for an existing profile so re-submissions update rather than
-    // creating a second row (which would leave the dashboard reading stale NULLs).
-    const { data: existing } = await supabase
-      .from('visa_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
+    const userId = session.user.id
+    console.log('[onboarding] submitting for user_id:', userId)
 
     const profileData = {
       visa_type: visaType,
@@ -69,27 +66,44 @@ export default function Onboarding() {
       university_name: university || null,
       country_of_citizenship: country,
     }
+    console.log('[onboarding] profileData:', profileData)
+
+    // Check for an existing profile so re-submissions update rather than
+    // creating a duplicate row with NULL dates.
+    const { data: existing, error: selectError } = await supabase
+      .from('visa_profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+
+    if (selectError) {
+      console.error('[onboarding] select error:', selectError)
+    }
 
     let saveError
     if (existing?.[0]) {
+      console.log('[onboarding] existing row found — updating')
       const { error } = await supabase
         .from('visa_profiles')
         .update(profileData)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
       saveError = error
     } else {
+      console.log('[onboarding] no existing row — inserting')
       const { error } = await supabase
         .from('visa_profiles')
-        .insert({ user_id: user.id, ...profileData })
+        .insert({ user_id: userId, ...profileData })
       saveError = error
     }
 
     if (saveError) {
+      console.error('[onboarding] save error:', saveError)
       setError(saveError.message)
       setLoading(false)
       return
     }
 
+    console.log('[onboarding] save successful')
     router.push('/dashboard')
   }
 
