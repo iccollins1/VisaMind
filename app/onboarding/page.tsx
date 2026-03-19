@@ -54,17 +54,38 @@ export default function Onboarding() {
       return
     }
 
-    const { error: insertError } = await supabase.from('visa_profiles').insert({
-      user_id: user.id,
+    // Check for an existing profile so re-submissions update rather than
+    // creating a second row (which would leave the dashboard reading stale NULLs).
+    const { data: existing } = await supabase
+      .from('visa_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+
+    const profileData = {
       visa_type: visaType,
-      program_start_date: startDate,
-      program_end_date: endDate,
+      program_start_date: startDate || null,
+      program_end_date: endDate || null,
       university_name: university || null,
       country_of_citizenship: country,
-    })
+    }
 
-    if (insertError) {
-      setError(insertError.message)
+    let saveError
+    if (existing?.[0]) {
+      const { error } = await supabase
+        .from('visa_profiles')
+        .update(profileData)
+        .eq('user_id', user.id)
+      saveError = error
+    } else {
+      const { error } = await supabase
+        .from('visa_profiles')
+        .insert({ user_id: user.id, ...profileData })
+      saveError = error
+    }
+
+    if (saveError) {
+      setError(saveError.message)
       setLoading(false)
       return
     }

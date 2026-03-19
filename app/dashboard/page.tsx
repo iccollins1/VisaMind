@@ -114,6 +114,7 @@ export default function Dashboard() {
         .from('visa_profiles')
         .select('visa_type, program_start_date, program_end_date, university_name, country_of_citizenship, plan_tier, opt_start_date, ai_questions_used, ai_questions_reset_date')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
         .limit(1)
 
       console.log('[dashboard] visa_profiles result:', { data, error })
