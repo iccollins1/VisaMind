@@ -47,6 +47,13 @@ export default function SignUp() {
       return
     }
 
+    // Fire-and-forget signup notification — does not block the redirect
+    fetch('/api/notifications/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, signupAt: new Date().toISOString() }),
+    }).catch(() => {/* non-critical — ignore errors */})
+
     router.push('/dashboard')
   }
 
