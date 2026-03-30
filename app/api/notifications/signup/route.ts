@@ -11,7 +11,7 @@ export async function POST(request: Request) {
 
   const { error } = await resend.emails.send({
     from: 'notifications@statusanchor.app',
-    to: 'ian@statusanchor.app',
+    to: 'collins.ian.m@gmail.com',
     subject: 'New StatusAnchor Signup 🎉',
     text: [
       'New signup on StatusAnchor.',
