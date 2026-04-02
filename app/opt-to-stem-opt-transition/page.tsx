@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'OPT to STEM OPT: How the Transition Works | StatusAnchor',
   description: 'USCIS regulations at 8 CFR 214.2(f)(10)(ii)(C) govern the OPT to STEM OPT transition. Learn the filing window, DSO requirements, 180-day rule, and Form I-983 obligations.',
+  alternates: { canonical: 'https://www.statusanchor.app/opt-to-stem-opt-transition' },
 }
 
 export default function OptToStemOptTransition() {

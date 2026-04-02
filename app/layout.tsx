@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.statusanchor.app"),
   title: "StatusAnchor",
   description: "Never miss a visa deadline again. StatusAnchor tracks your immigration timeline and explains every deadline in plain English.",
 };

@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'F-1 Visa Grace Period Rules: Your 60 Days Explained | StatusAnchor',
   description: 'USCIS regulations under 8 CFR 214.2(f)(5)(iv) establish the 60-day F-1 grace period. Learn what is and is not permitted during this period of authorized status.',
+  alternates: { canonical: 'https://www.statusanchor.app/f1-visa-grace-period' },
 }
 
 export default function F1GracePeriod() {

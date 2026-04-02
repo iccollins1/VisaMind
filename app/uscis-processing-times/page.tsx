@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'Current USCIS Processing Times by Form and Service Center | StatusAnchor',
   description: 'USCIS publishes official processing time data by form type and service center at uscis.gov. Learn how processing times are calculated and how to check your case status.',
+  alternates: { canonical: 'https://www.statusanchor.app/uscis-processing-times' },
 }
 
 export default function UscisProcessingTimes() {

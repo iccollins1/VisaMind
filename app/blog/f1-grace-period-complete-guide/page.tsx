@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'F-1 Grace Period: The Complete Guide to Your 60 Days | StatusAnchor',
   description: 'What is and is not permitted during the F-1 grace period, when it starts, how it interacts with OPT filing, and what USCIS regulations document about unlawful presence.',
+  alternates: { canonical: 'https://www.statusanchor.app/blog/f1-grace-period-complete-guide' },
 }
 
 export default function F1GracePeriodCompleteGuide() {

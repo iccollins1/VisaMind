@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'What Happens When OPT Expires: Your Options Explained | StatusAnchor',
   description: 'USCIS regulations document the pathways available when OPT expires: STEM OPT extension, H-1B cap-gap, change of status, and departure. Documented rules, not advice.',
+  alternates: { canonical: 'https://www.statusanchor.app/what-happens-after-opt-expires' },
 }
 
 export default function WhatHappensAfterOptExpires() {

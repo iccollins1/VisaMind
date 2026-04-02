@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'F-1 to H-1B: The Complete Transition Guide | StatusAnchor',
   description: 'USCIS regulations document the F-1 to H-1B transition pathway including the cap lottery, cap-gap rule, change of status vs. consular processing, and petition requirements.',
+  alternates: { canonical: 'https://www.statusanchor.app/f1-to-h1b-transition' },
 }
 
 export default function F1ToH1bTransition() {

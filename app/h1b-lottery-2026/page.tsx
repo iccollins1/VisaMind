@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'H-1B Lottery 2026: Dates, Odds, and What to Do Now | StatusAnchor',
   description: 'USCIS regulations govern the annual H-1B cap lottery, registration window, petition filing period, and cap-gap protection for F-1/OPT holders. Documented FY2026 information.',
+  alternates: { canonical: 'https://www.statusanchor.app/h1b-lottery-2026' },
 }
 
 export default function H1bLottery2026() {

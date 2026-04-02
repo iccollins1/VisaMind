@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'What Is an I-20? A Plain English Guide for International Students | StatusAnchor',
   description: 'The I-20 is issued by SEVP-certified schools, not USCIS. Learn what the I-20 documents, how it differs from the F-1 visa stamp, and when it must be updated.',
+  alternates: { canonical: 'https://www.statusanchor.app/uscis-i20-explained' },
 }
 
 export default function UscisI20Explained() {

@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'OPT Application Deadline Guide for F-1 Students in 2026 | StatusAnchor',
   description: 'The complete guide to the OPT application deadline: the 90-day to 60-day filing window, EAD start date rules, required documents, and what USCIS regulations say about late applications.',
+  alternates: { canonical: 'https://www.statusanchor.app/blog/opt-deadline-guide-2026' },
 }
 
 export default function OptDeadlineGuide2026() {

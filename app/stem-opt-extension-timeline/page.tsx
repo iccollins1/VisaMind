@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'STEM OPT Extension Timeline: Key Dates and Requirements | StatusAnchor',
   description: 'USCIS regulations at 8 CFR 214.2(f)(10)(ii)(C) govern the 24-month STEM OPT extension. Learn the application window, 180-day rule, E-Verify requirement, and key dates.',
+  alternates: { canonical: 'https://www.statusanchor.app/stem-opt-extension-timeline' },
 }
 
 export default function StemOptExtensionTimeline() {

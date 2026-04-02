@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'Immigration Guides for F-1 Students | StatusAnchor Blog',
   description: 'Plain-English guides to OPT deadlines, F-1 grace periods, STEM OPT extensions, H-1B lottery, and more — all based on publicly available USCIS guidance.',
+  alternates: { canonical: 'https://www.statusanchor.app/blog' },
 }
 
 const posts = [

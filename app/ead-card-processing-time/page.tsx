@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'EAD Card Processing Time: What to Expect in 2026 | StatusAnchor',
   description: 'USCIS publishes Form I-765 processing times by service center. Learn how EAD card processing works for OPT applicants, the 90-day filing window, and what to do if your card is delayed.',
+  alternates: { canonical: 'https://www.statusanchor.app/ead-card-processing-time' },
 }
 
 export default function EadCardProcessingTime() {

@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'OPT Application Deadline: What F-1 Students Need to Know | StatusAnchor',
   description: 'USCIS regulations establish a strict 90-day to 60-day filing window for OPT applications. Learn the documented rules governing Form I-765 deadlines for F-1 students.',
+  alternates: { canonical: 'https://www.statusanchor.app/opt-application-deadline' },
 }
 
 export default function OptApplicationDeadline() {

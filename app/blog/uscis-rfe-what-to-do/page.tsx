@@ -6,6 +6,7 @@ import SeoFooter from '@/app/components/SeoFooter'
 export const metadata: Metadata = {
   title: 'Got a USCIS RFE? Here Is What It Means and What to Do Next | StatusAnchor',
   description: 'A USCIS Request for Evidence requires immediate consultation with a licensed immigration attorney. This page explains what an RFE is — not how to respond to one.',
+  alternates: { canonical: 'https://www.statusanchor.app/blog/uscis-rfe-what-to-do' },
 }
 
 export default function UscisRfeWhatToDo() {
